@@ -8,7 +8,7 @@ local old=PG:FindFirstChild("PixelLineageAI")
 if old then old:Destroy() end
 local C={bg=Color3.fromRGB(12,16,26),panel=Color3.fromRGB(20,26,39),side=Color3.fromRGB(15,20,32),accent=Color3.fromRGB(65,145,255),txt=Color3.fromRGB(237,243,255),muted=Color3.fromRGB(147,163,190)}
 local gui=Instance.new("ScreenGui")
-gui.Name="PixelLineageAI";gui.ResetOnSpawn=false;gui.IgnoreGuiInset=true;gui.DisplayOrder=10000;gui.ZIndexBehavior=Enum.ZIndexBehavior.Global;gui.Parent=PG
+gui.Name="PixelLineageAI";gui.ResetOnSpawn=false;gui.IgnoreGuiInset=true;gui.DisplayOrder=1000000;gui.ZIndexBehavior=Enum.ZIndexBehavior.Global;gui.Parent=PG
 local function new(k,p,props)
  local o=Instance.new(k)
  for a,v in pairs(props or {}) do o[a]=v end
@@ -34,12 +34,17 @@ local function btn(parent,text,pos,size,callback)
  return b
 end
 local minimized=false
-local floating=btn(gui,"PIXEL AI",UDim2.new(0,20,.5,-20),UDim2.fromOffset(95,40),function() end)
-floating.Visible=false
+local floating=btn(gui,"ABRIR PIXEL AI",UDim2.new(1,-170,0,155),UDim2.fromOffset(155,44),function() end)
+floating.Visible=true
 local function minimize(v)
- minimized=v;root.Visible=not v;floating.Visible=v
+ minimized=v;root.Visible=not v;floating.Visible=true
 end
-floating.MouseButton1Click:Connect(function() minimize(false) end)
+floating.MouseButton1Click:Connect(function()
+ root.Position=UDim2.new(.5,-360,.5,-230)
+ root.Size=UDim2.fromOffset(720,460)
+ root.BackgroundTransparency=0
+ minimize(false)
+end)
 btn(top,"_",UDim2.new(1,-85,0,11),UDim2.fromOffset(32,32),function() minimize(true) end)
 btn(top,"X",UDim2.new(1,-45,0,11),UDim2.fromOffset(32,32),function() gui:Destroy() end)
 local content=new("ScrollingFrame",root,{Position=UDim2.fromOffset(188,73),Size=UDim2.new(1,-207,1,-91),BackgroundTransparency=1,ScrollBarThickness=3,CanvasSize=UDim2.new(),AutomaticCanvasSize=Enum.AutomaticSize.Y,BorderSizePixel=0})
@@ -178,8 +183,9 @@ UIS.InputBegan:Connect(function(input,processed)
  if not processed and input.KeyCode==Enum.KeyCode.RightShift and gui.Parent then minimize(not minimized) end
 end)
 show("Início")
+root.Visible=true
 local finalSize=root.Size
-root.Size=UDim2.fromOffset(600,380)
-root.BackgroundTransparency=1
-tw(root,.55,{Size=finalSize,BackgroundTransparency=0})
+root.Size=UDim2.fromOffset(720,460)
+root.BackgroundTransparency=0
+tw(root,.3,{Size=finalSize,BackgroundTransparency=0})
 log("Hub carregado com sucesso")
