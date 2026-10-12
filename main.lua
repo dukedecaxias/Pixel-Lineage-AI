@@ -27,7 +27,7 @@ local function label(parent,txt,pos,size,ts,color,bold)
  return mk("TextLabel",parent,{Position=pos,Size=size,BackgroundTransparency=1,Text=txt,TextColor3=color or col.white,Font=bold and Enum.Font.GothamBold or Enum.Font.Gotham,TextSize=ts or 13,TextXAlignment=Enum.TextXAlignment.Left,TextWrapped=true})
 end
 label(sidebar,"PIXEL  AI",UDim2.fromOffset(17,20),UDim2.fromOffset(140,30),22,col.white,true)
-label(sidebar,"LINEAGE  •  V3",UDim2.fromOffset(18,52),UDim2.fromOffset(140,20),11,col.blue,true)
+label(sidebar,"LINEAGE  •  V4 BETA",UDim2.fromOffset(18,52),UDim2.fromOffset(140,20),11,col.blue,true)
 local header=mk("Frame",root,{Position=UDim2.fromOffset(162,0),Size=UDim2.new(1,-162,0,55),BackgroundColor3=col.panel,BorderSizePixel=0})
 local title=label(header,"Personagem",UDim2.fromOffset(20,12),UDim2.new(1,-140,0,31),18,col.white,true)
 local function button(parent,text,pos,size,fn)
@@ -193,6 +193,116 @@ pages["Histórico"]=function()
  line("Combate operacional","Não integrado")
  line("Dados do personagem","Leitura parcial")
 end
+
+-- Motor de automacao baseado em texto visivel da interface.
+local VIM=game:GetService("VirtualInputManager")
+local engine={enabled=false,mode="Solo",step="Aguardando",lastAction="",lastError="",clicks=0,busy=false}
+local function visible(o)
+ if not o:IsA("GuiButton") or not o.Visible then return false end
+ local p=o.Parent
+ while p and p~=pg do
+  if p:IsA("GuiObject") and not p.Visible then return false end
+  if p:IsA("ScreenGui") and not p.Enabled then return false end
+  p=p.Parent
+ end
+ return true
+end
+local function normalize(s)
+ s=tostring(s or ""):lower()
+ s=s:gsub("á","a"):gsub("ã","a"):gsub("â","a"):gsub("é","e"):gsub("ê","e"):gsub("í","i"):gsub("ó","o"):gsub("ô","o"):gsub("ú","u"):gsub("ç","c")
+ return s:gsub("%s+"," ")
+end
+local function buttonText(o)
+ local t=o:IsA("TextButton") and o.Text or ""
+ if #t==0 then
+  for _,v in ipairs(o:GetDescendants()) do
+   if v:IsA("TextLabel") and v.Visible and #v.Text>0 then t=t.." "..v.Text end
+  end
+ end
+ return normalize(t.." "..o.Name)
+end
+local function candidates()
+ local out={}
+ for _,screen in ipairs(pg:GetChildren()) do
+  if screen:IsA("ScreenGui") and screen~=gui and screen.Enabled then
+   for _,o in ipairs(screen:GetDescendants()) do
+    if visible(o) and o.AbsoluteSize.X>8 and o.AbsoluteSize.Y>8 then
+     table.insert(out,{object=o,text=buttonText(o)})
+    end
+   end
+  end
+ end
+ return out
+end
+local function locate(keys,exclude)
+ for _,v in ipairs(candidates()) do
+  local blocked=false
+  for _,x in ipairs(exclude or {}) do if v.text:find(normalize(x),1,true) then blocked=true end end
+  if not blocked then
+   for _,key in ipairs(keys) do
+    if v.text:find(normalize(key),1,true) then return v.object,v.text end
+   end
+  end
+ end
+end
+local function click(o)
+ if not o or not visible(o) then return false,"Botao nao visivel" end
+ local ok,err=pcall(function()
+  local xy=o.AbsolutePosition+o.AbsoluteSize/2
+  VIM:SendMouseButtonEvent(xy.X,xy.Y,0,true,game,0)
+  task.wait(.08)
+  VIM:SendMouseButtonEvent(xy.X,xy.Y,0,false,game,0)
+ end)
+ if not ok then return false,tostring(err) end
+ return true
+end
+local function press(keys,step,exclude)
+ local o,txt=locate(keys,exclude)
+ if not o then return false end
+ local ok,err=click(o)
+ engine.step=step
+ if ok then engine.clicks=engine.clicks+1;engine.lastAction=txt else engine.lastError=err end
+ return ok
+end
+local function engineTick()
+ if engine.busy or not engine.enabled then return end
+ engine.busy=true
+ local ok,err=pcall(function()
+  if engine.mode=="Evento" then
+   if press({"entrar >","entrar","halloween"},"Selecionando evento") then return end
+   if press({"solo!"},"Iniciando evento") then return end
+  else
+   if press({"jogar solo","solo >"},"Abrindo corrida solo") then return end
+   if press({"set out","partir"},"Iniciando aventura") then return end
+   if press({"partir em uma jornada","partir >"},"Abrindo viagem") then return end
+  end
+  engine.step="Aguardando tela reconhecivel"
+ end)
+ if not ok then engine.lastError=tostring(err);engine.step="Erro" end
+ engine.busy=false
+end
+task.spawn(function()
+ while gui.Parent do
+  if engine.enabled then engineTick() end
+  task.wait(1.8)
+ end
+end)
+
+pages["Execução"]=function()
+ line("Estado",engine.enabled and "Executando" or "Parado")
+ line("Etapa",engine.step)
+ line("Cliques enviados",engine.clicks)
+ line("Última ação",engine.lastAction~="" and engine.lastAction or "Nenhuma")
+ line("Último erro",engine.lastError~="" and engine.lastError or "Nenhum")
+ action("Modo: "..engine.mode,function() engine.mode=engine.mode=="Solo" and "Evento" or "Solo";show("Execução") end)
+ action(engine.enabled and "PARAR EXECUÇÃO" or "INICIAR EXECUÇÃO",function()
+  engine.enabled=not engine.enabled
+  engine.step=engine.enabled and "Procurando menu" or "Parado"
+  show("Execução")
+ end)
+ action("ATUALIZAR STATUS",function() show("Execução") end)
+ paragraph("BETA: tenta acionar botões por texto visível e clique de mouse. Não executa combate e não confirma que o jogo aceitou cada clique. Pare se selecionar a opção errada.")
+end
 pages["Configurações"]=function()
  paragraph("Tecla de minimizar: RightShift. Use o botão flutuante PIXEL AI para recuperar a janela.")
  action("CENTRALIZAR JANELA",function() root.Position=UDim2.fromScale(.5,.5) end)
@@ -208,8 +318,8 @@ show=function(page)
  for n,b in pairs(nav) do tween(b,{BackgroundColor3=n==page and col.blue or Color3.fromRGB(36,48,69)},.15) end
  pages[page]()
 end
-for i,name in ipairs({"Personagem","AutoFarm","Combate","Progressão","Perfis","Histórico","Configurações","Créditos"}) do
- nav[name]=button(sidebar,name,UDim2.fromOffset(11,85+(i-1)*39),UDim2.fromOffset(141,33),function() show(name) end)
+for i,name in ipairs({"Personagem","AutoFarm","Combate","Progressão","Perfis","Histórico","Execução","Configurações","Créditos"}) do
+ nav[name]=button(sidebar,name,UDim2.fromOffset(11,80+(i-1)*36),UDim2.fromOffset(141,31),function() show(name) end)
 end
 label(sidebar,"RIGHTSHIFT  •  MINIMIZAR",UDim2.new(0,12,1,-36),UDim2.fromOffset(145,23),10,col.gray)
 local dragging,startMouse,startPosition=false,nil,nil
