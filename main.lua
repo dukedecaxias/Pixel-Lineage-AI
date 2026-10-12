@@ -27,7 +27,7 @@ local function label(parent,txt,pos,size,ts,color,bold)
  return mk("TextLabel",parent,{Position=pos,Size=size,BackgroundTransparency=1,Text=txt,TextColor3=color or col.white,Font=bold and Enum.Font.GothamBold or Enum.Font.Gotham,TextSize=ts or 13,TextXAlignment=Enum.TextXAlignment.Left,TextWrapped=true})
 end
 label(sidebar,"PIXEL  AI",UDim2.fromOffset(17,20),UDim2.fromOffset(140,30),22,col.white,true)
-label(sidebar,"LINEAGE  •  V2",UDim2.fromOffset(18,52),UDim2.fromOffset(140,20),11,col.blue,true)
+label(sidebar,"LINEAGE  •  V3",UDim2.fromOffset(18,52),UDim2.fromOffset(140,20),11,col.blue,true)
 local header=mk("Frame",root,{Position=UDim2.fromOffset(162,0),Size=UDim2.new(1,-162,0,55),BackgroundColor3=col.panel,BorderSizePixel=0})
 local title=label(header,"Personagem",UDim2.fromOffset(20,12),UDim2.new(1,-140,0,31),18,col.white,true)
 local function button(parent,text,pos,size,fn)
@@ -88,9 +88,43 @@ local function getValue(names)
  end
  return "Não disponível"
 end
-local toggles={farm=false,heal=false,defend=false,skills=false,combo=false}
+local toggles={farm=false,heal=true,defend=true,skills=true,combo=true,quest=false,boss=false,loot=true,safe=true}
+local settings={world="Automático",difficulty="Normal",event="Automático",goal="Experiência",minLevel=1,maxLevel=100,healAt=45,defendAt=30,bossAttempts=3,stopGold=0,stopCandy=0,skillPriority="Maior dano",profile="Equilibrado"}
+local worldOptions={"Automático","Ato 1","Ato 2","Ato 3","Personalizado"}
+local diffOptions={"Normal","Hard","Nightmare"}
+local eventOptions={"Automático","Camp","Scout","Trainer's Shrine","Mini-Boss","Ignorar eventos"}
+local goalOptions={"Experiência","Ouro","Candy","Itens","Progressão","Chefes"}
+local profiles={
+ ["Equilibrado"]={healAt=45,defendAt=30,goal="Experiência"},
+ ["Farm XP"]={healAt=55,defendAt=40,goal="Experiência"},
+ ["Farm Ouro"]={healAt=50,defendAt=35,goal="Ouro"},
+ ["Chefes"]={healAt=70,defendAt=55,goal="Chefes"},
+ ["Eventos"]={healAt=60,defendAt=40,goal="Progressão"}
+}
 local pages={}
 local show
+local function cycle(key,options)
+ local current=settings[key]
+ local index=1
+ for i,v in ipairs(options) do if v==current then index=i break end end
+ settings[key]=options[index%#options+1]
+ show(title.Text)
+end
+local function numberOption(key,labelText,increment,min,max)
+ action(labelText..": "..tostring(settings[key]).."  [+]",function()
+  settings[key]=settings[key]+increment
+  if settings[key]>max then settings[key]=min end
+  show(title.Text)
+ end)
+end
+local function toggleOption(key,name)
+ action((toggles[key] and "● " or "○ ")..name..(toggles[key] and "  [ATIVO NO PERFIL]" or "  [DESLIGADO]"),function()
+  toggles[key]=not toggles[key];show(title.Text)
+ end)
+end
+local function note()
+ paragraph("CONFIGURAÇÃO SOMENTE: os controles abaixo salvam escolhas nesta sessão, mas ainda não comandam o jogo. Não há AutoFarm funcional nesta versão.")
+end
 pages["Personagem"]=function()
  line("Jogador",player.DisplayName)
  line("Usuário Roblox","@"..player.Name)
@@ -103,16 +137,61 @@ pages["Personagem"]=function()
  local hum=player.Character and player.Character:FindFirstChildOfClass("Humanoid")
  line("Vida",hum and (math.floor(hum.Health).."/"..math.floor(hum.MaxHealth)) or getValue(aliases.vida))
  action("ATUALIZAR DADOS",function() show("Personagem") end)
- paragraph("Dados lidos de atributos e valores do jogador. Campos não disponíveis não são estimados.")
+ paragraph("Dados lidos de atributos e valores replicados ao jogador. Campos não disponíveis não são estimados.")
 end
-pages["Automação"]=function()
- paragraph("Configurações preparadas para futuras integrações. Estes interruptores não executam ações no jogo nesta versão.")
- for _,item in ipairs({{"farm","AutoFarm"},{"heal","Autocura"},{"defend","Autodefesa"},{"skills","Habilidades automáticas"},{"combo","Combos"}}) do
-  local key,name=item[1],item[2]
-  action((toggles[key] and "● " or "○ ")..name..(toggles[key] and "  [CONFIGURADO]" or "  [DESLIGADO]"),function()
-   toggles[key]=not toggles[key];show("Automação")
-  end)
- end
+pages["AutoFarm"]=function()
+ note()
+ action("Mundo: "..settings.world,function() cycle("world",worldOptions) end)
+ action("Dificuldade: "..settings.difficulty,function() cycle("difficulty",diffOptions) end)
+ action("Evento: "..settings.event,function() cycle("event",eventOptions) end)
+ action("Objetivo: "..settings.goal,function() cycle("goal",goalOptions) end)
+ numberOption("minLevel","Level mínimo",5,1,500)
+ numberOption("maxLevel","Level máximo",5,1,500)
+ toggleOption("farm","AutoFarm")
+ toggleOption("loot","Priorizar recompensas")
+ toggleOption("safe","Parar em situação insegura")
+end
+pages["Combate"]=function()
+ note()
+ numberOption("healAt","Curar abaixo de % HP",5,5,95)
+ numberOption("defendAt","Defender abaixo de % HP",5,5,95)
+ action("Prioridade de skills: "..settings.skillPriority,function() cycle("skillPriority",{"Maior dano","Menor custo","Suporte primeiro","Equilibrado"}) end)
+ toggleOption("heal","Autocura")
+ toggleOption("defend","Autodefesa")
+ toggleOption("skills","Skills automáticas")
+ toggleOption("combo","Combos")
+end
+pages["Progressão"]=function()
+ note()
+ toggleOption("quest","AutoQuest")
+ toggleOption("boss","AutoBoss")
+ numberOption("bossAttempts","Limite de tentativas em chefes",1,1,20)
+ numberOption("stopGold","Meta de ouro (0 = sem meta)",1000,0,100000)
+ numberOption("stopCandy","Meta de Candy (0 = sem meta)",100,0,10000)
+end
+pages["Perfis"]=function()
+ paragraph("Escolha um perfil predefinido. As preferências ficam ativas somente enquanto este painel estiver aberto.")
+ action("Perfil: "..settings.profile,function()
+  cycle("profile",{"Equilibrado","Farm XP","Farm Ouro","Chefes","Eventos"})
+  local p=profiles[settings.profile]
+  if p then for k,v in pairs(p) do settings[k]=v end end
+  show("Perfis")
+ end)
+ line("Objetivo atual",settings.goal)
+ line("Cura",settings.healAt.."% HP")
+ line("Defesa",settings.defendAt.."% HP")
+ action("COPIAR CONFIGURAÇÃO",function()
+  local parts={}
+  for k,v in pairs(settings) do table.insert(parts,k.."="..tostring(v)) end
+  table.sort(parts)
+  if setclipboard then setclipboard(table.concat(parts,"\n")) end
+ end)
+end
+pages["Histórico"]=function()
+ paragraph("Sessão iniciada: "..os.date("%H:%M:%S")..". O histórico de farm, ouro ganho, vitórias e drops exigirá integração real com eventos do jogo.")
+ line("AutoFarm operacional","Não integrado")
+ line("Combate operacional","Não integrado")
+ line("Dados do personagem","Leitura parcial")
 end
 pages["Configurações"]=function()
  paragraph("Tecla de minimizar: RightShift. Use o botão flutuante PIXEL AI para recuperar a janela.")
@@ -129,8 +208,8 @@ show=function(page)
  for n,b in pairs(nav) do tween(b,{BackgroundColor3=n==page and col.blue or Color3.fromRGB(36,48,69)},.15) end
  pages[page]()
 end
-for i,name in ipairs({"Personagem","Automação","Configurações","Créditos"}) do
- nav[name]=button(sidebar,name,UDim2.fromOffset(11,90+(i-1)*49),UDim2.fromOffset(141,39),function() show(name) end)
+for i,name in ipairs({"Personagem","AutoFarm","Combate","Progressão","Perfis","Histórico","Configurações","Créditos"}) do
+ nav[name]=button(sidebar,name,UDim2.fromOffset(11,85+(i-1)*39),UDim2.fromOffset(141,33),function() show(name) end)
 end
 label(sidebar,"RIGHTSHIFT  •  MINIMIZAR",UDim2.new(0,12,1,-36),UDim2.fromOffset(145,23),10,col.gray)
 local dragging,startMouse,startPosition=false,nil,nil
