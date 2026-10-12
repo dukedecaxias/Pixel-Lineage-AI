@@ -7,13 +7,20 @@ local gui = Instance.new("ScreenGui")
 gui.Name = "PixelLineageAI_Diagnostico"
 gui.ResetOnSpawn = false
 local parent = player:WaitForChild("PlayerGui")
-local old = parent:FindFirstChild(gui.Name)
+local CoreGui = game:GetService("CoreGui")
+local guiParent = parent
+pcall(function()
+ if gethui then guiParent = gethui() elseif CoreGui then guiParent = CoreGui end
+end)
+local old = guiParent:FindFirstChild(gui.Name)
 if old then old:Destroy() end
-gui.Parent = parent
+gui.Parent = guiParent
+pcall(function() game:GetService("StarterGui"):SetCore("SendNotification",{Title="Pixel Lineage AI",Text="Painel carregado. Versao 0.2",Duration=6}) end)
 local frame = Instance.new("Frame")
 frame.Size = UDim2.fromOffset(390,330)
 frame.Position = UDim2.new(0.5,-195,0.5,-165)
 frame.BackgroundColor3 = Color3.fromRGB(25,29,39)
+frame.ZIndex = 10
 frame.Parent = gui
 Instance.new("UICorner",frame).CornerRadius = UDim.new(0,12)
 local function label(text,y,h)
